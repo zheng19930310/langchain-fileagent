@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Langchain FileAgent - AI文件助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 90%;
+            max-width: 900px;
+            height: 85vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 顶部工具栏 */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            gap: 10px;
+        }
+
+        .toolbar-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+            flex-shrink: 0;
+        }
+
+        .toolbar-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.4);
+        }
+
+        .session-select {
+            flex: 1;
+            padding: 8px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 13px;
+            background: white;
+            color: #333;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .session-select:focus {
+            border-color: #667eea;
+        }
+
+        /* 聊天区域 */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #fafafa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.ai {
+            justify-content: flex-start;
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            line-height: 1.5;
+        }
+
+        .message.user .message-bubble {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.ai .message-bubble {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 4px;
+        }
+
+        /* 输入区域 */
+        .input-area {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .file-upload-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .file-upload-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 20px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .message-input:focus {
+            border-color: #667eea;
+        }
+
+        .send-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        .send-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 文件预览 */
+        .file-preview {
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            display: none;
+        }
+
+        .file-preview.active {
+            display: block;
+        }
+
+        .file-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            margin: 4px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .file-remove {
+            cursor: pointer;
+            color: #999;
+            font-weight: bold;
+        }
+
+        .file-remove:hover {
+            color: #ff4444;
+        }
+
+        /* 加载动画 */
+        .typing-indicator {
+            display: inline-flex;
+            gap: 4px;
+            padding: 12px 16px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 18px;
+            border-bottom-left-radius: 4px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #999;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+
+        /* 知识库状态 */
+        .kb-status {
+            padding: 8px 12px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        /* 滚动条样式 */
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <!-- 顶部工具栏 -->
+        <div class="toolbar">
+            <button class="toolbar-btn" onclick="createNewChat()" title="新建会话">+</button>
+            <select class="session-select" id="sessionSelect" onchange="selectSession(this.value)">
+                <option value="">选择会话...</option>
+            </select>
+            <button class="toolbar-btn" onclick="refreshSessions()" title="刷新会话列表">↻</button>
+        </div>
+
+        <!-- 聊天消息区域 -->
+        <div class="chat-messages" id="chatMessages">
+            <div class="message ai">
+                <div class="message-bubble">
+                    👋 你好！我是 Langchain FileAgent，可以帮你管理文件和回答问题。<br><br>
+                    💡 提示：<br>
+                    • 直接提问，我会使用文件工具帮助你<br>
+                    • 点击 📎 按钮上传文档到知识库<br>
+                    • 支持 PDF、Word、Excel、PPT 等格式
+                </div>
+            </div>
+        </div>
+
+        <!-- 文件预览区域 -->
+        <div class="file-preview" id="filePreview"></div>
+
+        <!-- 输入区域 -->
+        <div class="input-area">
+            <input type="file" id="fileInput" multiple style="display: none;" accept=".txt,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
+            <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="上传文件">📎</button>
+            <input type="text" class="message-input" id="messageInput" placeholder="输入消息..." onkeypress="handleKeyPress(event)">
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+        </div>
+    </div>
+
+    <script>
+        let currentSessionId = '';
+        let uploadedFiles = [];
+        const API_BASE = 'http://localhost:8082';
+
+        // 初始化
+        window.onload = function() {
+            generateSessionId();
+            refreshSessions();
+            
+            // 文件上传监听
+            document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        };
+
+        // 生成会话ID
+        function generateSessionId() {
+            currentSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            updateSessionSelect();
+        }
+
+        // 更新会话选择器
+        function updateSessionSelect() {
+            const select = document.getElementById('sessionSelect');
+            const option = document.createElement('option');
+            option.value = currentSessionId;
+            option.text = currentSessionId;
+            select.appendChild(option);
+            select.value = currentSessionId;
+        }
+
+        // 创建新会话
+        function createNewChat() {
+            generateSessionId();
+            clearMessages();
+            addMessage('ai', '✨ 已创建新会话，开始新的对话吧！');
+        }
+
+        // 刷新会话列表
+        async function refreshSessions() {
+            try {
+                const response = await fetch(`${API_BASE}/api/chat/sessions`);
+                const sessions = await response.json();
+                
+                const select = document.getElementById('sessionSelect');
+                select.innerHTML = '<option value="">选择会话...</option>';
+                
+                sessions.forEach(session => {
+                    const option = document.createElement('option');
+                    option.value = session.session_id;
+                    option.text = session.session_id;
+                    select.appendChild(option);
+                });
+                
+                if (currentSessionId) {
+                    select.value = currentSessionId;
+                }
+            } catch (error) {
+                console.error('刷新会话列表失败:', error);
+            }
+        }
+
+        // 选择会话
+        async function selectSession(sessionId) {
+            if (!sessionId) return;
+            
+            currentSessionId = sessionId;
+            clearMessages();
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/chat/session/${encodeURIComponent(sessionId)}`);
+                const messages = await response.json();
+                
+                messages.forEach(msg => {
+                    addMessage(msg.type === 'human' ? 'user' : 'ai', msg.text);
+                });
+            } catch (error) {
+                console.error('加载会话失败:', error);
+                addMessage('ai', '❌ 加载会话失败');
+            }
+        }
+
+        // 清空消息
+        function clearMessages() {
+            const container = document.getElementById('chatMessages');
+            container.innerHTML = '';
+        }
+
+        // 添加消息
+        function addMessage(type, text) {
+            const container = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            bubble.textContent = text;
+            
+            messageDiv.appendChild(bubble);
+            container.appendChild(messageDiv);
+            
+            // 滚动到底部
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 显示加载动画
+        function showTypingIndicator() {
+            const container = document.getElementById('chatMessages');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message ai';
+            typingDiv.id = 'typingIndicator';
+            
+            const indicator = document.createElement('div');
+            indicator.className = 'typing-indicator';
+            indicator.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+            
+            typingDiv.appendChild(indicator);
+            container.appendChild(typingDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 隐藏加载动画
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+
+        // 发送消息
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            if (!currentSessionId) {
+                alert('请先选择或创建会话');
+                return;
+            }
+            
+            // 显示用户消息
+            addMessage('user', message);
+            input.value = '';
+            
+            // 禁用发送按钮
+            document.getElementById('sendBtn').disabled = true;
+            
+            // 显示加载动画
+            showTypingIndicator();
+            
+            try {
+                let response;
+                
+                // 如果有上传的文件，使用带文件的聊天接口
+                if (uploadedFiles.length > 0) {
+                    const formData = new FormData();
+                    formData.append('message', message);
+                    formData.append('sessionId', currentSessionId);
+                    
+                    uploadedFiles.forEach((file, index) => {
+                        formData.append(`files`, file);
+                    });
+                    
+                    response = await fetch(`${API_BASE}/api/chat/with-files`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    // 清空已上传文件
+                    uploadedFiles = [];
+                    updateFilePreview();
+                } else {
+                    // 普通聊天
+                    response = await fetch(`${API_BASE}/api/chat`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            message: message,
+                            sessionId: currentSessionId
+                        })
+                    });
+                }
+                
+                const data = await response.json();
+                hideTypingIndicator();
+                addMessage('ai', data.response || data.message || '抱歉，没有收到回复');
+            } catch (error) {
+                hideTypingIndicator();
+                addMessage('ai', `❌ 请求失败: ${error.message}`);
+            } finally {
+                document.getElementById('sendBtn').disabled = false;
+            }
+        }
+
+        // 处理回车键
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // 处理文件选择
+        function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+            
+            files.forEach(file => {
+                uploadedFiles.push(file);
+            });
+            
+            updateFilePreview();
+            
+            // 清空文件输入，允许重复选择同一文件
+            event.target.value = '';
+        }
+
+        // 更新文件预览
+        function updateFilePreview() {
+            const preview = document.getElementById('filePreview');
+            
+            if (uploadedFiles.length === 0) {
+                preview.classList.remove('active');
+                preview.innerHTML = '';
+                return;
+            }
+            
+            preview.classList.add('active');
+            preview.innerHTML = uploadedFiles.map((file, index) => `
+                <div class="file-item">
+                    <span>${getFileIcon(file.name)} ${file.name}</span>
+                    <span class="file-remove" onclick="removeFile(${index})">×</span>
+                </div>
+            `).join('');
+        }
+
+        // 移除文件
+        function removeFile(index) {
+            uploadedFiles.splice(index, 1);
+            updateFilePreview();
+        }
+
+        // 获取文件图标
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                'pdf': '📄',
+                'doc': '📝',
+                'docx': '📝',
+                'xls': '📊',
+                'xlsx': '📊',
+                'ppt': '📽️',
+                'pptx': '📽️',
+                'txt': '📃'
+            };
+            return icons[ext] || '📎';
+        }
+    </script>
+</body>
+</html>

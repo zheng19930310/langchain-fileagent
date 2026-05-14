@@ -1,0 +1,25 @@
+# Langchain FileAgent 依赖包
+
+# Web框架
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Langchain核心
+langchain==0.1.5
+langchain-openai==0.0.5
+langchain-community==0.0.17
+
+# 数据处理
+pydantic==2.10.0
+python-dotenv==1.0.0
+
+# 文件处理
+python-docx==1.1.0
+openpyxl==3.1.2
+PyPDF2==3.0.1
+python-pptx==0.6.23
+
+# 工具库
+aiofiles==23.2.1
+loguru==0.7.2
